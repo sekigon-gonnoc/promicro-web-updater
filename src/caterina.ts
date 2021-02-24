@@ -273,7 +273,7 @@ class CaterinaBootloader {
         return Promise.reject(new Error("Verify failed"));
       }
     }
-    progress("Verify OK");
+    progress("Verify OK.");
   }
 
   private async initBootloader(
@@ -347,11 +347,11 @@ class CaterinaBootloader {
 
     progress("Erase all...");
     await this.eraseAll();
-    progress("Erase complete...");
+    progress("Erase complete.");
 
     progress(`Flash ${bin.length} bytes...`);
     await this.writeFlash(bin, progress);
-    progress("Flash complete...");
+    progress("Flash complete.");
 
     await this.verifyFlash(bin, progress);
 
