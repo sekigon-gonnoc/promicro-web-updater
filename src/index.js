@@ -22,6 +22,9 @@ function updateProgress(str) {
 }
 
 if (!navigator.serial) {
+  initProgress(
+    "Web serial is unavailable. Please use Google Chrome and enable experimental features.\n"
+  );
   console.error("Web serial is unavailable");
 }
 
