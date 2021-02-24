@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pro Micro Web Writer</title>
+  </head>
+  <body>
+    <main>
+      <div>
+        <a id="download-file" href="#" download="firm.bin"></a>
+        <input type="file" id="upload-file" />
+      </div>
+      <input type="button" id="read" value="read" />
+      <input type="button" id="verify" value="verify" />
+      <input type="button" id="flash" value="flash" />
+      <div>
+        <textarea readonly cols="100" rows="20" id="progress"></textarea>
+      </div>
+      <div id="revision"></div>
+      <script src="./src/index.js"></script>
+    </main>
+  </body>
+</html>
