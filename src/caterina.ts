@@ -42,8 +42,8 @@ class CaterinaBootloader {
     return ret;
   }
 
-  private async verifyCommandSent() {
-    let ret = await this.readResponse(1, 1000);
+  private async verifyCommandSent(timeout: number = 1000) {
+    let ret = await this.readResponse(1, timeout);
     if (ret[0] != "\r".charCodeAt(0)) {
       return Promise.reject(new Error(`Command failed. res:${ret[0]}`));
     }
@@ -193,7 +193,8 @@ class CaterinaBootloader {
 
   private async eraseAll() {
     await this.com.writeString("e");
-    await this.verifyCommandSent();
+    // Erase command takes ~5s
+    await this.verifyCommandSent(6000);
   }
 
   private async writeFlash(
