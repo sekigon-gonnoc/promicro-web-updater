@@ -14,6 +14,8 @@ const ATMEGA32U4: Mcu = {
   bootAddr: 0x7000,
 };
 
+type FlashType = "flash" | "eeprom";
+
 class CaterinaBootloader {
   private comReceiveBuffer: number[] = [];
   private bufferSize: number;
@@ -155,27 +157,36 @@ class CaterinaBootloader {
 
   private async readFlash(
     len: number,
+    flashType: FlashType,
     progress: (str: string) => void = () => {}
   ): Promise<number[]> {
     let cmd = Array(4);
+    let blockSize: number;
     let block: number[];
     let res = Array(0);
     cmd[0] = "g".charCodeAt(0);
-    cmd[3] = "F".charCodeAt(0);
+
+    if (flashType == "flash") {
+      cmd[3] = "F".charCodeAt(0);
+      blockSize = this.bufferSize;
+    } else if (flashType == "eeprom") {
+      cmd[3] = "E".charCodeAt(0);
+      blockSize = 1;
+    }
 
     let addr = 0;
     await this.setAddress(addr);
 
     while (addr < len) {
-      cmd[1] = this.bufferSize >> 8;
-      cmd[2] = this.bufferSize & 0xff;
+      cmd[1] = blockSize >> 8;
+      cmd[2] = blockSize & 0xff;
 
       await this.com.write(Uint8Array.from(cmd));
-      block = await this.readResponse(this.bufferSize, 1000);
+      block = await this.readResponse(blockSize, 1000);
 
       res = res.concat(Array.from(block));
 
-      addr += this.bufferSize;
+      addr += blockSize;
 
       progress(".");
     }
@@ -200,13 +211,21 @@ class CaterinaBootloader {
 
   private async writeFlash(
     bin: Uint8Array,
+    flashType: FlashType,
     progress: (str: string) => void = () => {}
   ) {
+    let blockSize: number;
     let cmd = Array(4);
     cmd[0] = "B".charCodeAt(0);
-    cmd[3] = "F".charCodeAt(0);
 
-    let blockSize = this.bufferSize;
+    if (flashType == "flash") {
+      cmd[3] = "F".charCodeAt(0);
+      blockSize = this.bufferSize;
+    } else if (flashType == "eeprom") {
+      cmd[3] = "E".charCodeAt(0);
+      blockSize = 1;
+    }
+
     let addr = 0;
     await this.setAddress(addr);
 
@@ -260,12 +279,13 @@ class CaterinaBootloader {
 
   private async verifyFlash(
     bin: Uint8Array,
+    flashType: FlashType,
     progress: (str: string) => void = (str) => {
       console.log(str);
     }
   ) {
-    progress(`Verify ${bin.length} bytes...`);
-    let firm = await this.readFlash(bin.length, progress);
+    progress(`Verify ${flashType} ${bin.length} bytes...`);
+    let firm = await this.readFlash(bin.length, flashType, progress);
     console.log(firm);
     for (let idx = 0; idx < bin.length; idx++) {
       if (bin[idx] != firm[idx]) {
@@ -316,7 +336,7 @@ class CaterinaBootloader {
     size = Math.min(this.mcu.flashSize, size);
 
     progress(`Reading ${size} bytes...`);
-    let firm = await this.readFlash(size, progress);
+    let firm = await this.readFlash(size, "flash", progress);
     progress(`Read complete`);
 
     await this.exit();
@@ -329,6 +349,7 @@ class CaterinaBootloader {
   async write(
     com: WebSerial,
     bin: Uint8Array,
+    eep: Uint8Array | null = null,
     progress: (str: string) => void = (str) => {
       console.log(str);
     }
@@ -338,7 +359,7 @@ class CaterinaBootloader {
     if (bin.length > this.mcu.bootAddr) {
       return Promise.reject(
         new Error(
-          `Binary image size exceeds limit ${bin.length}>{mcu.bootAddr}`
+          `Binary image size exceeds limit ${bin.length}>${this.mcu.bootAddr}`
         )
       );
     }
@@ -350,10 +371,25 @@ class CaterinaBootloader {
     progress("Erase complete.");
 
     progress(`Flash ${bin.length} bytes...`);
-    await this.writeFlash(bin, progress);
+    await this.writeFlash(bin, "flash", progress);
     progress("Flash complete.");
 
-    await this.verifyFlash(bin, progress);
+    await this.verifyFlash(bin, "flash", progress);
+
+    if (eep != null) {
+      if (eep.length > this.mcu.eepromSize) {
+        return Promise.reject(
+          new Error(
+            `EEPROM image size exceeds limit ${eep.length}>${this.mcu.eepromSize}`
+          )
+        );
+      }
+      progress(`Flash eeprom ${eep.length} bytes...`);
+      await this.writeFlash(eep, "eeprom", progress);
+      progress("Flash eeprom complete.");
+
+      await this.verifyFlash(eep, "eeprom", progress);
+    }
 
     await this.leaveProgMode();
 
@@ -377,7 +413,7 @@ class CaterinaBootloader {
       );
     }
 
-    await this.verifyFlash(bin, progress);
+    await this.verifyFlash(bin, "flash", progress);
     await this.exit();
   }
 }

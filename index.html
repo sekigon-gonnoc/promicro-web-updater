@@ -33,9 +33,36 @@
         <a id="download-file" href="#" download="firm.bin"></a>
         <input type="file" id="upload-file" />
       </div>
-      <input type="button" id="read" value="read" />
-      <input type="button" id="verify" value="verify" />
-      <input type="button" id="flash" value="flash" />
+      <div>
+        <form id="eeprom">
+          eeprom option:
+          <input
+            type="radio"
+            id="eep-none"
+            name="eeprom"
+            value="none"
+            checked
+          /><label for="eep-none">none</label>
+          <input
+            type="radio"
+            id="eep-left"
+            name="eeprom"
+            value="split-left"
+          /><label for="eep-left">split-left</label>
+
+          <input
+            type="radio"
+            id="eep-right"
+            name="eeprom"
+            value="split-right"
+          /><label for="eep-right">split-right</label>
+        </form>
+      </div>
+      <div>
+        <input type="button" id="read" value="read" />
+        <input type="button" id="verify" value="verify" />
+        <input type="button" id="flash" value="flash" />
+      </div>
       <div>
         <textarea readonly cols="100" rows="20" id="progress"></textarea>
       </div>

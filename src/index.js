@@ -28,6 +28,25 @@ if (!navigator.serial) {
   console.error("Web serial is unavailable");
 }
 
+async function loadEepromHex() {
+  let eepromOption = document.getElementById("eeprom");
+  if (eepromOption.eeprom.value === "none") {
+    return null;
+  } else if (eepromOption.eeprom.value === "split-left") {
+    let hex = await fetch("./eeprom-lefthand.eep").then((r) => {
+      return r.text();
+    });
+    console.log(ihex.parse(hex));
+    return new Uint8Array(ihex.parse(hex).data);
+  } else if (eepromOption.eeprom.value === "split-right") {
+    let hex = await fetch("./eeprom-righthand.eep").then((r) => {
+      return r.text();
+    });
+    console.log(ihex.parse(hex));
+    return new Uint8Array(ihex.parse(hex).data);
+  }
+}
+
 async function readFirmware() {
   initProgress("Reset Pro Micro and choose serial port appeared.");
   await serial.open(null);
@@ -103,10 +122,12 @@ async function flashFirmware() {
     initProgress("Reset Pro Micro and choose serial port appeared.");
   }
 
+  let eep = await loadEepromHex();
+
   await serial.open(null);
   serial.startReadLoop();
   try {
-    await caterina.write(serial, firmHex.data, updateProgress);
+    await caterina.write(serial, firmHex.data, eep, updateProgress);
   } catch (e) {
     console.error(e);
     updateProgress(e.toString());
