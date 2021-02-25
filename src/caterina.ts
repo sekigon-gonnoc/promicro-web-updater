@@ -283,17 +283,19 @@ class CaterinaBootloader {
     progress("Verify OK.");
   }
 
+  private async openPort() {
+    this.com = new WebSerial(128, 5);
+    await this.com.open(null);
+    this.comReceiveBuffer = [];
+    this.com.startReadLoop();
+    this.com.setReceiveCallback(this.receiveResponse.bind(this));
+  }
+
   private async initBootloader(
     progress: (str: string) => void = (str) => {
       console.log(str);
     }
   ) {
-    this.com = new WebSerial(128, 5);
-    await this.com.open(null);
-    this.com.startReadLoop();
-
-    this.comReceiveBuffer = [];
-    this.com.setReceiveCallback(this.receiveResponse.bind(this));
     let isCaterin = await this.detect();
     if (!isCaterin) {
       progress("Caterina bootloader is not found");
@@ -316,22 +318,31 @@ class CaterinaBootloader {
       console.log(str);
     }
   ): Promise<Uint8Array> {
-    await this.initBootloader(progress);
+    let firm: number[];
 
-    if (size == 0) {
-      size = this.mcu.flashSize;
+    await this.openPort();
+
+    try {
+      await this.initBootloader(progress);
+
+      if (size == 0) {
+        size = this.mcu.flashSize;
+      }
+      size = Math.min(this.mcu.flashSize, size);
+
+      progress(`Reading ${size} bytes...`);
+      firm = await this.readFlash(size, "flash", progress);
+      progress(`Read complete`);
+
+      await this.exit();
+
+      console.log(firm);
+    } catch (e) {
+      progress("\n" + e.toString() + "\n");
+      progress("Firm read failed\n");
+    } finally {
+      await this.com.close();
     }
-    size = Math.min(this.mcu.flashSize, size);
-
-    progress(`Reading ${size} bytes...`);
-    let firm = await this.readFlash(size, "flash", progress);
-    progress(`Read complete`);
-
-    await this.exit();
-
-    console.log(firm);
-
-    await this.com.close();
 
     return Uint8Array.from(firm);
   }
@@ -343,48 +354,55 @@ class CaterinaBootloader {
       console.log(str);
     }
   ) {
-    await this.initBootloader(progress);
+    await this.openPort();
 
-    if (bin.length > this.mcu.bootAddr) {
-      return Promise.reject(
-        new Error(
-          `Binary image size exceeds limit ${bin.length}>${this.mcu.bootAddr}`
-        )
-      );
-    }
+    try {
+      await this.initBootloader(progress);
 
-    await this.enterProgMode();
-
-    progress("Erase all...");
-    await this.eraseAll();
-    progress("Erase complete.");
-
-    progress(`Flash ${bin.length} bytes...`);
-    await this.writeFlash(bin, "flash", progress);
-    progress("Flash complete.");
-
-    await this.verifyFlash(bin, "flash", progress);
-
-    if (eep != null) {
-      if (eep.length > this.mcu.eepromSize) {
+      if (bin.length > this.mcu.bootAddr) {
         return Promise.reject(
           new Error(
-            `EEPROM image size exceeds limit ${eep.length}>${this.mcu.eepromSize}`
+            `Binary image size exceeds limit ${bin.length}>${this.mcu.bootAddr}`
           )
         );
       }
-      progress(`Flash eeprom ${eep.length} bytes...`);
-      await this.writeFlash(eep, "eeprom", progress);
-      progress("Flash eeprom complete.");
 
-      await this.verifyFlash(eep, "eeprom", progress);
+      await this.enterProgMode();
+
+      progress("Erase all...");
+      await this.eraseAll();
+      progress("Erase complete.");
+
+      progress(`Flash ${bin.length} bytes...`);
+      await this.writeFlash(bin, "flash", progress);
+      progress("Flash complete.");
+
+      await this.verifyFlash(bin, "flash", progress);
+
+      if (eep != null) {
+        if (eep.length > this.mcu.eepromSize) {
+          return Promise.reject(
+            new Error(
+              `EEPROM image size exceeds limit ${eep.length}>${this.mcu.eepromSize}`
+            )
+          );
+        }
+        progress(`Flash eeprom ${eep.length} bytes...`);
+        await this.writeFlash(eep, "eeprom", progress);
+        progress("Flash eeprom complete.");
+
+        await this.verifyFlash(eep, "eeprom", progress);
+      }
+
+      await this.leaveProgMode();
+
+      await this.exit();
+    } catch (e) {
+      progress("\n" + e.toString() + "\n");
+      progress("Firm read failed\n");
+    } finally {
+      await this.com.close();
     }
-
-    await this.leaveProgMode();
-
-    await this.exit();
-
-    await this.com.close();
   }
 
   async verify(
@@ -393,20 +411,27 @@ class CaterinaBootloader {
       console.log(str);
     }
   ) {
-    await this.initBootloader(progress);
+    await this.openPort();
 
-    if (bin.length > this.mcu.bootAddr) {
-      return Promise.reject(
-        new Error(
-          `Binary image size exceeds limit ${bin.length}>{mcu.bootAddr}`
-        )
-      );
+    try {
+      await this.initBootloader(progress);
+
+      if (bin.length > this.mcu.bootAddr) {
+        return Promise.reject(
+          new Error(
+            `Binary image size exceeds limit ${bin.length}>{mcu.bootAddr}`
+          )
+        );
+      }
+
+      await this.verifyFlash(bin, "flash", progress);
+      await this.exit();
+    } catch (e) {
+      progress("\n" + e.toString() + "\n");
+      progress("Firm read failed\n");
+    } finally {
+      await this.com.close();
     }
-
-    await this.verifyFlash(bin, "flash", progress);
-    await this.exit();
-
-    await this.com.close();
   }
 }
 
