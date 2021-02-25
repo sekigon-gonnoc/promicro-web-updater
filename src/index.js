@@ -1,10 +1,10 @@
-import { WebSerial } from "./webSerial";
 import { CaterinaBootloader } from "./caterina";
 
-const serial = new WebSerial(128, 5);
 const caterina = new CaterinaBootloader();
 const ihex = require("intel-hex");
 let firmHex = null;
+
+let bootloader = caterina;
 
 let progress = document.getElementById("progress");
 function initProgress(str) {
@@ -49,10 +49,8 @@ async function loadEepromHex() {
 
 async function readFirmware() {
   initProgress("Reset Pro Micro and choose serial port appeared.");
-  await serial.open(null);
-  serial.startReadLoop();
   try {
-    let firm = await caterina.read(serial, 0, updateProgress);
+    let firm = await bootloader.read(0, updateProgress);
     let blob = new Blob([firm]);
     let a = document.getElementById("download-file");
     a.href = URL.createObjectURL(blob, { type: "application/octet-binary" });
@@ -60,8 +58,6 @@ async function readFirmware() {
   } catch (e) {
     console.error(e);
   }
-
-  await serial.close();
 }
 
 document
@@ -103,15 +99,12 @@ async function verifyFirmware() {
     initProgress("Reset Pro Micro and choose serial port appeared.");
   }
 
-  await serial.open(null);
-  serial.startReadLoop();
   try {
-    await caterina.verify(serial, firmHex.data, updateProgress);
+    await bootloader.verify(firmHex.data, updateProgress);
   } catch (e) {
     console.error(e);
     updateProgress(e.toString());
   }
-  await serial.close();
 }
 
 async function flashFirmware() {
@@ -124,15 +117,12 @@ async function flashFirmware() {
 
   let eep = await loadEepromHex();
 
-  await serial.open(null);
-  serial.startReadLoop();
   try {
-    await caterina.write(serial, firmHex.data, eep, updateProgress);
+    await bootloader.write(firmHex.data, eep, updateProgress);
   } catch (e) {
     console.error(e);
     updateProgress(e.toString());
   }
-  await serial.close();
 }
 
 document.getElementById("read").onclick = readFirmware;

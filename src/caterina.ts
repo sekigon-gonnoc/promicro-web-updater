@@ -1,18 +1,5 @@
 import { WebSerial } from "./webSerial";
-
-type Mcu = {
-  signature: number;
-  flashSize: number;
-  eepromSize: number;
-  bootAddr: number;
-};
-
-const ATMEGA32U4: Mcu = {
-  signature: 0x1e9587,
-  flashSize: 32768,
-  eepromSize: 1024,
-  bootAddr: 0x7000,
-};
+import { Mcu, MCU } from "./mcu";
 
 type FlashType = "flash" | "eeprom";
 
@@ -297,12 +284,14 @@ class CaterinaBootloader {
   }
 
   private async initBootloader(
-    com: WebSerial,
     progress: (str: string) => void = (str) => {
       console.log(str);
     }
   ) {
-    this.com = com;
+    this.com = new WebSerial(128, 5);
+    await this.com.open(null);
+    this.com.startReadLoop();
+
     this.comReceiveBuffer = [];
     this.com.setReceiveCallback(this.receiveResponse.bind(this));
     let isCaterin = await this.detect();
@@ -311,9 +300,9 @@ class CaterinaBootloader {
     }
     let signature = await this.readSignature();
 
-    if (signature == ATMEGA32U4.signature) {
+    if (signature == MCU.atmega32u4.signature) {
       progress("atmega32u4 found.");
-      this.mcu = ATMEGA32U4;
+      this.mcu = MCU.atmega32u4;
     } else {
       progress("No flash config for this mcu");
 
@@ -322,13 +311,12 @@ class CaterinaBootloader {
   }
 
   async read(
-    com: WebSerial,
     size: number = 0,
     progress: (str: string) => void = (str) => {
       console.log(str);
     }
   ): Promise<Uint8Array> {
-    await this.initBootloader(com, progress);
+    await this.initBootloader(progress);
 
     if (size == 0) {
       size = this.mcu.flashSize;
@@ -343,18 +331,19 @@ class CaterinaBootloader {
 
     console.log(firm);
 
+    await this.com.close();
+
     return Uint8Array.from(firm);
   }
 
   async write(
-    com: WebSerial,
     bin: Uint8Array,
     eep: Uint8Array | null = null,
     progress: (str: string) => void = (str) => {
       console.log(str);
     }
   ) {
-    await this.initBootloader(com, progress);
+    await this.initBootloader(progress);
 
     if (bin.length > this.mcu.bootAddr) {
       return Promise.reject(
@@ -394,16 +383,17 @@ class CaterinaBootloader {
     await this.leaveProgMode();
 
     await this.exit();
+
+    await this.com.close();
   }
 
   async verify(
-    com: WebSerial,
     bin: Uint8Array,
     progress: (str: string) => void = (str) => {
       console.log(str);
     }
   ) {
-    await this.initBootloader(com, progress);
+    await this.initBootloader(progress);
 
     if (bin.length > this.mcu.bootAddr) {
       return Promise.reject(
@@ -415,6 +405,8 @@ class CaterinaBootloader {
 
     await this.verifyFlash(bin, "flash", progress);
     await this.exit();
+
+    await this.com.close();
   }
 }
 
