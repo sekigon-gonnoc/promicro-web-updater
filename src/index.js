@@ -23,7 +23,7 @@ function updateProgress(str) {
 
 if (!navigator.serial) {
   initProgress(
-    "Web serial is unavailable.\nPlease use Google Chrome and and set the #enable-experimental-web-platform-features flag in chrome://flags.\n"
+    "Web serial is unavailable.\nPlease use Google Chrome or Chromium Edge\n"
   );
   console.error("Web serial is unavailable");
 }
